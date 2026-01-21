@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- Ajuste crítico de viewport para evitar zoom y scroll no deseado en móviles -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Rutas Tijuana - Planeador Urbano</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+
+    <!-- FontAwesome para Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* CSS Reset y Utilidades */
+        body {
+            /* Usamos dvh (dynamic viewport height) para soportar navegadores móviles correctamente */
+            height: 100dvh; 
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 0;
+            background: #e5e7eb; /* Color de fondo mientras carga */
+        }
+        
+        /* Ocultar panel nativo de Leaflet */
+        .leaflet-routing-container {
+            display: none !important;
+        }
+
+        /* Transiciones suaves para el panel */
+        .panel-transition {
+            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Scrollbar personalizado delgado */
+        .custom-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col md:flex-row">
+
+    <!-- CONTENEDOR DEL MAPA (Orden 1 en móvil para que esté arriba, Orden 2 en Desktop) -->
+    <main class="flex-1 relative h-full w-full order-1 md:order-2 z-0">
+        <div id="map"></div>
+        
+        <!-- Botón flotante para recentrar (Ajustado para no chocar con controles de mapa o panel) -->
+        <button onclick="centerMap()" class="absolute top-4 right-4 md:bottom-6 md:right-6 z-[400] bg-white w-10 h-10 md:w-12 md:h-12 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 text-gray-700 flex items-center justify-center text-lg md:text-xl transition-transform active:scale-95 border border-gray-200" title="Centrar en Tijuana">
+            <i class="fa-solid fa-location-crosshairs"></i>
+        </button>
+    </main>
+
+    <!-- BARRA LATERAL / PANEL INFERIOR (Orden 2 en móvil, Orden 1 en Desktop) -->
+    <aside id="sidebar" class="bg-white shadow-2xl z-[1000] flex flex-col order-2 md:order-1 w-full md:w-96 panel-transition border-t md:border-t-0 md:border-r border-gray-200">
+        
+        <!-- HEADER DEL PANEL (Siempre visible) -->
+        <!-- En móvil actúa como botón para expandir/colapsar -->
+        <div class="p-3 md:p-4 bg-red-700 text-white flex justify-between items-center shrink-0 cursor-pointer md:cursor-default relative" onclick="toggleMobilePanel()">
+            
+            <!-- Indicador visual de "arrastrar" para móvil (pequeña barra gris arriba) -->
+            <div class="absolute -top-3 left-0 right-0 h-6 flex justify-center md:hidden pointer-events-none">
+                <div class="w-12 h-1.5 bg-gray-300/80 rounded-full shadow-sm backdrop-blur-sm"></div>
+            </div>
+
+            <div class="flex flex-col">
+                <h1 class="text-lg md:text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-map-location-dot"></i> 
+                    <span>Rutas Tijuana</span>
+                </h1>
+                <p class="text-[10px] md:text-xs text-red-200 opacity-90">Planeador Urbano</p>
+            </div>
+            
+            <!-- Botón Chevron (Solo móvil) -->
+            <button id="toggle-btn" class="md:hidden text-white focus:outline-none p-2 rounded-full hover:bg-red-600 transition-colors">
+                <i class="fa-solid fa-chevron-up transition-transform duration-300" id="toggle-icon"></i>
+            </button>
+        </div>
+
+        <!-- CONTENIDO DEL PANEL (Scrollable) -->
+        <div id="panel-content" class="flex flex-col flex-1 overflow-hidden bg-white">
+            
+            <!-- Controles Principales -->
+            <div class="p-3 md:p-4 space-y-3 border-b border-gray-100 shrink-0">
+                <!-- Status Box -->
+                <div class="bg-blue-50 p-2.5 rounded-md border border-blue-100 text-sm text-blue-800 flex items-start gap-2 shadow-sm">
+                    <i class="fa-solid fa-circle-info mt-0.5 text-blue-600 shrink-0"></i>
+                    <span id="status-text" class="leading-tight text-xs md:text-sm">Toca el mapa para fijar <strong>Inicio</strong>.</span>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="resetMap()" class="bg-gray-50 hover:bg-gray-100 active:bg-gray-200 text-gray-700 py-2.5 px-3 rounded-md transition flex items-center justify-center gap-2 text-sm font-semibold border border-gray-200">
+                        <i class="fa-solid fa-trash-can text-gray-500"></i> Limpiar
+                    </button>
+                    <button onclick="exportRoute()" id="btn-export" disabled class="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-2.5 px-3 rounded-md transition opacity-50 cursor-not-allowed flex items-center justify-center gap-2 text-sm font-semibold shadow-sm">
+                        <i class="fa-solid fa-download"></i> <span class="truncate">GeoJSON</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lista de Instrucciones (Área flexible) -->
+            <div class="flex-1 overflow-y-auto p-3 bg-gray-50 custom-scroll relative" id="instructions-panel">
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-4 text-gray-400">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="fa-solid fa-route text-2xl text-gray-300"></i>
+                    </div>
+                    <p class="text-sm font-medium text-gray-500">Sin ruta activa</p>
+                    <p class="text-xs text-gray-400 mt-1">Selecciona dos puntos en el mapa</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-2 bg-gray-50 text-gray-400 text-[10px] text-center border-t border-gray-200 shrink-0">
+                &copy; 2026 Tijuana Maps | OSM Data
+            </div>
+        </div>
+    </aside>
+
+    <!-- SCRIPTS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        // --- CONFIGURACIÓN ---
+        const TJ_COORDS = [32.5149, -117.0382];
+        const MAP_Z_INDEX = 0;
+        
+        let map;
+        let routingControl = null;
+        let startPoint = null;
+        let endPoint = null;
+        
+        // Estado UI Móvil
+        let isMobilePanelExpanded = false; // Por defecto colapsado en móvil
+        const sidebar = document.getElementById('sidebar');
+        const toggleIcon = document.getElementById('toggle-icon');
+
+        // Alturas para móvil (usando vh para responsividad)
+        const MOBILE_COLLAPSED_HEIGHT = '65px'; // Solo header
+        const MOBILE_EXPANDED_HEIGHT = '55vh';  // Más de la mitad de pantalla
+
+        window.onload = function() {
+            initMap();
+            applyResponsiveLayout();
+            
+            // Listener para resize (giro de pantalla o cambio de tamaño)
+            window.addEventListener('resize', applyResponsiveLayout);
+        };
+
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                tap: false // Importante para móviles en algunas versiones de Leaflet
+            }).setView(TJ_COORDS, 13);
+
+            // Zoom control posicionado para no estorbar
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OSM',
+                maxZoom: 19
+            }).addTo(map);
+
+            map.on('click', onMapClick);
+        }
+
+        // --- GESTIÓN RESPONSIVA Y UI ---
+
+        function applyResponsiveLayout() {
+            const isDesktop = window.innerWidth >= 768;
+            
+            if (isDesktop) {
+                // Modo Escritorio: Sidebar ocupa toda la altura a la izquierda
+                sidebar.style.height = '100%';
+                sidebar.style.width = null; // Usar clase Tailwind (w-96)
+                toggleIcon.style.display = 'none'; // Ocultar icono toggle
+            } else {
+                // Modo Móvil: Bottom Sheet
+                toggleIcon.style.display = 'block';
+                // Respetar estado actual (o inicializar)
+                sidebar.style.height = isMobilePanelExpanded ? MOBILE_EXPANDED_HEIGHT : MOBILE_COLLAPSED_HEIGHT;
+            }
+            
+            // Forzar actualización del mapa cuando cambia el layout
+            setTimeout(() => { if(map) map.invalidateSize(); }, 300);
+        }
+
+        function toggleMobilePanel() {
+            if (window.innerWidth >= 768) return; // No hacer nada en desktop
+
+            isMobilePanelExpanded = !isMobilePanelExpanded;
+            
+            // Actualizar altura
+            sidebar.style.height = isMobilePanelExpanded ? MOBILE_EXPANDED_HEIGHT : MOBILE_COLLAPSED_HEIGHT;
+            
+            // Rotar icono
+            if (isMobilePanelExpanded) {
+                toggleIcon.classList.remove('fa-chevron-up');
+                toggleIcon.classList.add('fa-chevron-down');
+            } else {
+                toggleIcon.classList.remove('fa-chevron-down');
+                toggleIcon.classList.add('fa-chevron-up');
+            }
+        }
+
+        // Abrir panel automáticamente cuando se necesite (ej: al mostrar instrucciones)
+        function openMobilePanel() {
+            if (window.innerWidth < 768 && !isMobilePanelExpanded) {
+                toggleMobilePanel();
+            }
+        }
+
+        // --- LÓGICA DE RUTAS ---
+
+        function onMapClick(e) {
+            if (startPoint && endPoint) {
+                resetMap(); 
+                setStartPoint(e.latlng);
+                return;
+            }
+
+            if (!startPoint) {
+                setStartPoint(e.latlng);
+            } else if (!endPoint) {
+                setEndPoint(e.latlng);
+            }
+        }
+
+        function setStartPoint(latlng) {
+            startPoint = latlng;
+            
+            L.marker(startPoint, {
+                icon: L.divIcon({
+                    className: 'bg-transparent',
+                    html: '<div class="relative"><i class="fa-solid fa-location-dot text-blue-600 text-4xl drop-shadow-lg stroke-white" style="-webkit-text-stroke: 1px white;"></i><div class="absolute -bottom-1 left-1/2 w-4 h-1 bg-black/20 blur-sm rounded-full -translate-x-1/2"></div></div>',
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 38],
+                    popupAnchor: [0, -35]
+                })
+            }).addTo(map);
+
+            updateStatus("Ahora toca el <strong>Destino</strong>.");
+        }
+
+        function setEndPoint(latlng) {
+            endPoint = latlng;
+            calculateRoute();
+            updateStatus("<i class='fa-solid fa-spinner fa-spin'></i> Calculando ruta...");
+            
+            // Abrir panel en móvil para que el usuario vea que algo pasa
+            openMobilePanel();
+        }
+
+        function calculateRoute() {
+            if (routingControl) map.removeControl(routingControl);
+
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(startPoint.lat, startPoint.lng),
+                    L.latLng(endPoint.lat, endPoint.lng)
+                ],
+                routeWhileDragging: false,
+                showAlternatives: false, // Simplificar para móvil
+                language: 'es',
+                lineOptions: {
+                    styles: [{color: '#dc2626', opacity: 0.8, weight: 6}]
+                },
+                createGeocoder: function() { return null; },
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: true
+            }).addTo(map);
+
+            routingControl.on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                const timeMinutes = Math.round(summary.totalTime / 60);
+                const distanceKm = (summary.totalDistance / 1000).toFixed(1);
+                
+                updateStatus(`<strong>${timeMinutes} min</strong> (${distanceKm} km)`);
+                
+                // Activar botón exportar
+                const btnExport = document.getElementById('btn-export');
+                btnExport.disabled = false;
+                btnExport.classList.remove('opacity-50', 'cursor-not-allowed');
+
+                renderInstructions(routes[0].instructions);
+                
+                // Asegurar que el panel esté visible para ver las instrucciones
+                openMobilePanel();
+            });
+            
+            // Ocultar UI nativa LRM
+            setTimeout(() => {
+                const lrmContainer = document.querySelector('.leaflet-routing-container');
+                if(lrmContainer) lrmContainer.style.display = 'none';
+            }, 50);
+        }
+
+        function renderInstructions(instructions) {
+            const panel = document.getElementById('instructions-panel');
+            panel.innerHTML = ''; 
+
+            const ul = document.createElement('ul');
+            ul.className = 'space-y-2 pb-4'; // padding bottom extra para scroll
+
+            instructions.forEach((instr, i) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm';
+                
+                let iconClass = 'fa-arrow-up';
+                const text = instr.text.toLowerCase();
+                let colorClass = 'text-gray-500';
+
+                // Lógica de iconos mejorada
+                if (text.includes('izquierda')) { iconClass = 'fa-arrow-turn-up fa-rotate-270'; colorClass = 'text-blue-600'; }
+                else if (text.includes('derecha')) { iconClass = 'fa-arrow-turn-up fa-rotate-90'; colorClass = 'text-blue-600'; }
+                else if (text.includes('rotonda')) { iconClass = 'fa-spin fa-arrows-spin'; colorClass = 'text-purple-600'; }
+                else if (text.includes('llegado') || instr.type === 'DestinationReached') { iconClass = 'fa-flag-checkered'; colorClass = 'text-red-600'; }
+                
+                li.innerHTML = `
+                    <div class="mt-0.5 w-6 text-center shrink-0 ${colorClass}"><i class="fa-solid ${iconClass}"></i></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm text-gray-700 leading-snug font-medium">${instr.text}</div>
+                        <div class="text-xs text-gray-400 font-mono mt-1">
+                            ${i === instructions.length - 1 ? 'Fin' : (instr.distance < 1000 ? Math.round(instr.distance) + ' m' : (instr.distance/1000).toFixed(1) + ' km')}
+                        </div>
+                    </div>
+                `;
+                ul.appendChild(li);
+            });
+
+            panel.appendChild(ul);
+        }
+
+        function resetMap() {
+            startPoint = null;
+            endPoint = null;
+            
+            if (routingControl) {
+                map.removeControl(routingControl);
+                routingControl = null;
+            }
+
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            document.getElementById('instructions-panel').innerHTML = `
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-4 text-gray-400">
+                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="fa-solid fa-route text-2xl text-gray-300"></i>
+                    </div>
+                    <p class="text-sm font-medium text-gray-500">Mapa reiniciado</p>
+                    <p class="text-xs text-gray-400 mt-1">Toca para empezar de nuevo</p>
+                </div>
+            `;
+            
+            const btnExport = document.getElementById('btn-export');
+            btnExport.disabled = true;
+            btnExport.classList.add('opacity-50', 'cursor-not-allowed');
+
+            updateStatus("Toca el mapa para fijar <strong>Inicio</strong>.");
+            
+            centerMap();
+            
+            // En móvil, colapsamos el panel para dejar ver el mapa limpio
+            if (window.innerWidth < 768) {
+                isMobilePanelExpanded = true; 
+                toggleMobilePanel(); // Esto lo colapsará porque estaba true
+            }
+        }
+
+        function centerMap() {
+            map.flyTo(TJ_COORDS, 13);
+        }
+
+        function updateStatus(htmlMsg) {
+            document.getElementById('status-text').innerHTML = htmlMsg;
+        }
+
+        function exportRoute() {
+            if (!routingControl || !routingControl._routes || routingControl._routes.length === 0) return;
+            
+            try {
+                const route = routingControl._routes[0];
+                const coordinates = route.coordinates; 
+                const geoJSON = {
+                    "type": "FeatureCollection",
+                    "features": [{
+                        "type": "Feature",
+                        "properties": {
+                            "name": "Ruta Tijuana",
+                            "distance_m": route.summary.totalDistance,
+                            "time_s": route.summary.totalTime
+                        },
+                        "geometry": {
+                            "type": "LineString",
+                            "coordinates": coordinates.map(c => [c.lng, c.lat]) 
+                        }
+                    }]
+                };
+
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geoJSON));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `ruta_tijuana_${Date.now()}.geojson`);
+                document.body.appendChild(downloadAnchorNode); 
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+
+            } catch (error) {
+                console.error("Error export:", error);
+                alert("Error al exportar. Intenta nuevamente.");
+            }
+        }
+    </script>
+</body>
+</html>
