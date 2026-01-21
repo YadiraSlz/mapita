@@ -2,9 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Ajuste crítico de viewport para evitar zoom y scroll no deseado en móviles -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Rutas Tijuana - Planeador Urbano</title>
+    <title>Mapa de Yadi 🌸</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,122 +17,153 @@
     <!-- FontAwesome para Iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Google Fonts: Quicksand -->
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+
     <style>
-        /* CSS Reset y Utilidades */
+        /* CSS Reset y Estilos Base */
         body {
-            /* Usamos dvh (dynamic viewport height) para soportar navegadores móviles correctamente */
             height: 100dvh; 
             width: 100vw;
             margin: 0;
             padding: 0;
             overflow: hidden;
+            font-family: 'Quicksand', sans-serif;
         }
 
         #map {
             height: 100%;
             width: 100%;
             z-index: 0;
-            background: #e5e7eb; /* Color de fondo mientras carga */
+            background: #fdf2f8;
         }
         
         /* Ocultar panel nativo de Leaflet */
-        .leaflet-routing-container {
-            display: none !important;
-        }
+        .leaflet-routing-container { display: none !important; }
 
-        /* Transiciones suaves para el panel */
         .panel-transition {
-            transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: height 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
         }
 
-        /* Scrollbar personalizado delgado */
         .custom-scroll {
             scrollbar-width: thin;
-            scrollbar-color: #cbd5e1 transparent;
+            scrollbar-color: #f472b6 transparent;
         }
-        .custom-scroll::-webkit-scrollbar {
-            width: 6px;
-        }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 4px;
+            background-color: #f472b6;
+            border-radius: 10px;
+        }
+
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.2);
+            background-color: #fff;
         }
     </style>
 </head>
-<body class="bg-gray-100 flex flex-col md:flex-row">
+<body class="bg-pink-50 flex flex-col md:flex-row">
 
-    <!-- CONTENEDOR DEL MAPA (Orden 1 en móvil para que esté arriba, Orden 2 en Desktop) -->
+    <!-- MAPA -->
     <main class="flex-1 relative h-full w-full order-1 md:order-2 z-0">
         <div id="map"></div>
         
-        <!-- Botón flotante para recentrar (Ajustado para no chocar con controles de mapa o panel) -->
-        <button onclick="centerMap()" class="absolute top-4 right-4 md:bottom-6 md:right-6 z-[400] bg-white w-10 h-10 md:w-12 md:h-12 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 text-gray-700 flex items-center justify-center text-lg md:text-xl transition-transform active:scale-95 border border-gray-200" title="Centrar en Tijuana">
-            <i class="fa-solid fa-location-crosshairs"></i>
-        </button>
+        <!-- Botones Flotantes -->
+        <div class="absolute top-4 right-4 md:bottom-8 md:right-8 z-[400] flex flex-col gap-3">
+            <button onclick="locateUser()" class="bg-white w-11 h-11 md:w-14 md:h-14 rounded-full shadow-lg shadow-pink-100 hover:bg-pink-50 active:bg-pink-100 text-pink-500 flex items-center justify-center text-xl transition-all active:scale-95 border-2 border-white" title="Mi Ubicación">
+                <i class="fa-solid fa-location-arrow"></i>
+            </button>
+
+            <button onclick="centerMap()" class="bg-white w-11 h-11 md:w-14 md:h-14 rounded-full shadow-lg shadow-pink-100 hover:bg-pink-50 active:bg-pink-100 text-gray-600 flex items-center justify-center text-xl transition-all active:scale-95 border-2 border-white" title="Ver Tijuana">
+                <i class="fa-solid fa-city"></i>
+            </button>
+        </div>
     </main>
 
-    <!-- BARRA LATERAL / PANEL INFERIOR (Orden 2 en móvil, Orden 1 en Desktop) -->
-    <aside id="sidebar" class="bg-white shadow-2xl z-[1000] flex flex-col order-2 md:order-1 w-full md:w-96 panel-transition border-t md:border-t-0 md:border-r border-gray-200">
+    <!-- PANEL LATERAL / INFERIOR -->
+    <aside id="sidebar" class="bg-white/95 backdrop-blur-sm shadow-[0_-5px_25px_-5px_rgba(0,0,0,0.1)] z-[1000] flex flex-col order-2 md:order-1 w-full md:w-[400px] panel-transition rounded-t-3xl md:rounded-none border-r border-pink-100">
         
-        <!-- HEADER DEL PANEL (Siempre visible) -->
-        <!-- En móvil actúa como botón para expandir/colapsar -->
-        <div class="p-3 md:p-4 bg-red-700 text-white flex justify-between items-center shrink-0 cursor-pointer md:cursor-default relative" onclick="toggleMobilePanel()">
-            
-            <!-- Indicador visual de "arrastrar" para móvil (pequeña barra gris arriba) -->
+        <!-- HEADER -->
+        <div class="p-4 bg-gradient-to-r from-pink-500 to-rose-400 text-white flex justify-between items-center shrink-0 cursor-pointer md:cursor-default relative md:rounded-br-3xl shadow-lg shadow-pink-200" onclick="toggleMobilePanel()">
             <div class="absolute -top-3 left-0 right-0 h-6 flex justify-center md:hidden pointer-events-none">
-                <div class="w-12 h-1.5 bg-gray-300/80 rounded-full shadow-sm backdrop-blur-sm"></div>
+                <div class="w-12 h-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-md"></div>
             </div>
 
             <div class="flex flex-col">
-                <h1 class="text-lg md:text-xl font-bold flex items-center gap-2">
-                    <i class="fa-solid fa-map-location-dot"></i> 
-                    <span>Rutas Tijuana</span>
+                <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2 tracking-tight">
+                    <i class="fa-solid fa-heart text-pink-200"></i> 
+                    <span>Mapa de Yadi</span>
                 </h1>
-                <p class="text-[10px] md:text-xs text-red-200 opacity-90">Planeador Urbano</p>
+                <p class="text-xs text-pink-100 font-medium ml-1">Explorando Tijuana</p>
             </div>
             
-            <!-- Botón Chevron (Solo móvil) -->
-            <button id="toggle-btn" class="md:hidden text-white focus:outline-none p-2 rounded-full hover:bg-red-600 transition-colors">
+            <button id="toggle-btn" class="md:hidden text-white focus:outline-none p-2 rounded-full hover:bg-white/20 transition-colors">
                 <i class="fa-solid fa-chevron-up transition-transform duration-300" id="toggle-icon"></i>
             </button>
         </div>
 
-        <!-- CONTENIDO DEL PANEL (Scrollable) -->
-        <div id="panel-content" class="flex flex-col flex-1 overflow-hidden bg-white">
+        <!-- CONTENIDO DEL PANEL -->
+        <div id="panel-content" class="flex flex-col flex-1 overflow-hidden bg-white md:bg-transparent">
             
-            <!-- Controles Principales -->
-            <div class="p-3 md:p-4 space-y-3 border-b border-gray-100 shrink-0">
-                <!-- Status Box -->
-                <div class="bg-blue-50 p-2.5 rounded-md border border-blue-100 text-sm text-blue-800 flex items-start gap-2 shadow-sm">
-                    <i class="fa-solid fa-circle-info mt-0.5 text-blue-600 shrink-0"></i>
-                    <span id="status-text" class="leading-tight text-xs md:text-sm">Toca el mapa para fijar <strong>Inicio</strong>.</span>
+            <!-- Inputs de Ruta -->
+            <div class="p-4 space-y-3 border-b border-pink-50 shrink-0 bg-white/50">
+                
+                <!-- Input Inicio -->
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-regular fa-circle text-pink-400 group-focus-within:text-pink-600 text-xs"></i>
+                    </div>
+                    <input type="text" id="start-input" placeholder="¿Dónde estás?" 
+                           class="w-full pl-9 pr-10 py-2.5 rounded-2xl border-2 border-pink-100 bg-pink-50/30 text-gray-700 placeholder-pink-300 focus:border-pink-400 transition-all text-sm font-semibold shadow-sm"
+                           onkeypress="handleSearch(event, 'start')">
+                    <button onclick="searchLocation('start')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-pink-300 hover:text-pink-600 cursor-pointer transition-colors" title="Buscar inicio">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+
+                <!-- Línea conectora visual -->
+                <div class="absolute left-7 top-[78px] h-6 w-0.5 bg-pink-200 hidden md:block z-0 pointer-events-none opacity-50"></div>
+
+                <!-- Input Destino -->
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-location-dot text-rose-500 group-focus-within:text-rose-600 text-sm"></i>
+                    </div>
+                    <input type="text" id="end-input" placeholder="¿A dónde vamos?" 
+                           class="w-full pl-9 pr-10 py-2.5 rounded-2xl border-2 border-pink-100 bg-pink-50/30 text-gray-700 placeholder-pink-300 focus:border-pink-400 transition-all text-sm font-semibold shadow-sm"
+                           onkeypress="handleSearch(event, 'end')">
+                    <button onclick="searchLocation('end')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-pink-300 hover:text-pink-600 cursor-pointer transition-colors" title="Buscar destino">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
                 </div>
 
                 <!-- Botones de Acción -->
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="resetMap()" class="bg-gray-50 hover:bg-gray-100 active:bg-gray-200 text-gray-700 py-2.5 px-3 rounded-md transition flex items-center justify-center gap-2 text-sm font-semibold border border-gray-200">
-                        <i class="fa-solid fa-trash-can text-gray-500"></i> Limpiar
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                    <button onclick="resetMap()" class="group bg-white hover:bg-gray-50 text-gray-500 py-2 px-4 rounded-xl transition border border-gray-100 flex items-center justify-center gap-2 text-xs font-bold shadow-sm hover:shadow active:scale-95">
+                        <i class="fa-regular fa-trash-can group-hover:text-pink-400"></i> Limpiar
                     </button>
-                    <button onclick="exportRoute()" id="btn-export" disabled class="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-2.5 px-3 rounded-md transition opacity-50 cursor-not-allowed flex items-center justify-center gap-2 text-sm font-semibold shadow-sm">
-                        <i class="fa-solid fa-download"></i> <span class="truncate">GeoJSON</span>
+                    <button onclick="exportRoute()" id="btn-export" disabled class="bg-gradient-to-r from-pink-500 to-rose-400 hover:from-pink-600 hover:to-rose-500 text-white py-2 px-4 rounded-xl transition opacity-50 cursor-not-allowed flex items-center justify-center gap-2 text-xs font-bold shadow-lg shadow-pink-200 active:scale-95">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> <span class="truncate">Guardar Ruta</span>
                     </button>
+                </div>
+                
+                <!-- Status bar pequeño -->
+                <div class="text-[10px] text-center text-pink-400 font-medium truncate px-2" id="status-text">
+                    Toca el mapa o busca para comenzar ✨
                 </div>
             </div>
 
-            <!-- Lista de Instrucciones (Área flexible) -->
-            <div class="flex-1 overflow-y-auto p-3 bg-gray-50 custom-scroll relative" id="instructions-panel">
-                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-4 text-gray-400">
-                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                        <i class="fa-solid fa-route text-2xl text-gray-300"></i>
-                    </div>
-                    <p class="text-sm font-medium text-gray-500">Sin ruta activa</p>
-                    <p class="text-xs text-gray-400 mt-1">Selecciona dos puntos en el mapa</p>
+            <!-- Lista de Instrucciones -->
+            <div class="flex-1 overflow-y-auto p-4 custom-scroll relative bg-white" id="instructions-panel">
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 opacity-60">
+                    <img src="https://cdn-icons-png.flaticon.com/512/263/263115.png" alt="Map Icon" class="w-20 h-20 mb-4 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                    <p class="text-pink-300 font-bold text-lg">¿Lista para irnos?</p>
+                    <p class="text-xs text-gray-400 mt-1">Ingresa inicio y destino arriba</p>
                 </div>
             </div>
-
-            <!-- Footer -->
-            <div class="p-2 bg-gray-50 text-gray-400 text-[10px] text-center border-t border-gray-200 shrink-0">
-                &copy; 2026 Tijuana Maps | OSM Data
+            
+            <div class="p-2 text-center text-[10px] text-pink-300 bg-white border-t border-pink-50">
+                Hecho con 💖 para Yadi
             </div>
         </div>
     </aside>
@@ -143,138 +173,210 @@
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // --- CONFIGURACIÓN ---
         const TJ_COORDS = [32.5149, -117.0382];
-        const MAP_Z_INDEX = 0;
-        
         let map;
         let routingControl = null;
-        let startPoint = null;
-        let endPoint = null;
         
-        // Estado UI Móvil
-        let isMobilePanelExpanded = false; // Por defecto colapsado en móvil
+        // Estado de Puntos y Marcadores
+        let startPoint = null;
+        let startMarker = null;
+        
+        let endPoint = null;
+        let endMarker = null;
+        
+        // UI State
+        let isMobilePanelExpanded = false;
         const sidebar = document.getElementById('sidebar');
         const toggleIcon = document.getElementById('toggle-icon');
 
-        // Alturas para móvil (usando vh para responsividad)
-        const MOBILE_COLLAPSED_HEIGHT = '65px'; // Solo header
-        const MOBILE_EXPANDED_HEIGHT = '55vh';  // Más de la mitad de pantalla
+        const MOBILE_COLLAPSED_HEIGHT = '90px'; // Un poco más alto por el header
+        const MOBILE_EXPANDED_HEIGHT = '70vh';  // Más espacio para ver inputs
 
         window.onload = function() {
             initMap();
             applyResponsiveLayout();
-            
-            // Listener para resize (giro de pantalla o cambio de tamaño)
             window.addEventListener('resize', applyResponsiveLayout);
         };
 
         function initMap() {
             map = L.map('map', {
                 zoomControl: false,
-                tap: false // Importante para móviles en algunas versiones de Leaflet
+                tap: false
             }).setView(TJ_COORDS, 13);
 
-            // Zoom control posicionado para no estorbar
-            L.control.zoom({ position: 'topright' }).addTo(map);
+            L.control.zoom({ position: 'topleft' }).addTo(map);
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OSM',
-                maxZoom: 19
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                maxZoom: 20
             }).addTo(map);
 
             map.on('click', onMapClick);
         }
 
-        // --- GESTIÓN RESPONSIVA Y UI ---
+        // --- BÚSQUEDA ---
 
-        function applyResponsiveLayout() {
-            const isDesktop = window.innerWidth >= 768;
-            
-            if (isDesktop) {
-                // Modo Escritorio: Sidebar ocupa toda la altura a la izquierda
-                sidebar.style.height = '100%';
-                sidebar.style.width = null; // Usar clase Tailwind (w-96)
-                toggleIcon.style.display = 'none'; // Ocultar icono toggle
-            } else {
-                // Modo Móvil: Bottom Sheet
-                toggleIcon.style.display = 'block';
-                // Respetar estado actual (o inicializar)
-                sidebar.style.height = isMobilePanelExpanded ? MOBILE_EXPANDED_HEIGHT : MOBILE_COLLAPSED_HEIGHT;
-            }
-            
-            // Forzar actualización del mapa cuando cambia el layout
-            setTimeout(() => { if(map) map.invalidateSize(); }, 300);
-        }
-
-        function toggleMobilePanel() {
-            if (window.innerWidth >= 768) return; // No hacer nada en desktop
-
-            isMobilePanelExpanded = !isMobilePanelExpanded;
-            
-            // Actualizar altura
-            sidebar.style.height = isMobilePanelExpanded ? MOBILE_EXPANDED_HEIGHT : MOBILE_COLLAPSED_HEIGHT;
-            
-            // Rotar icono
-            if (isMobilePanelExpanded) {
-                toggleIcon.classList.remove('fa-chevron-up');
-                toggleIcon.classList.add('fa-chevron-down');
-            } else {
-                toggleIcon.classList.remove('fa-chevron-down');
-                toggleIcon.classList.add('fa-chevron-up');
+        function handleSearch(event, type) {
+            if (event.key === 'Enter') {
+                searchLocation(type);
             }
         }
 
-        // Abrir panel automáticamente cuando se necesite (ej: al mostrar instrucciones)
-        function openMobilePanel() {
-            if (window.innerWidth < 768 && !isMobilePanelExpanded) {
-                toggleMobilePanel();
+        async function searchLocation(type) {
+            const inputId = type === 'start' ? 'start-input' : 'end-input';
+            const query = document.getElementById(inputId).value;
+            
+            if(!query) return;
+            
+            // Efecto visual de carga
+            const btn = document.querySelector(`button[onclick="searchLocation('${type}')"] i`);
+            const originalIcon = btn.className;
+            btn.className = 'fa-solid fa-spinner fa-spin';
+
+            try {
+                const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query + ' Tijuana Mexico')}&limit=1`);
+                if (!response.ok) throw new Error('Network error');
+                const data = await response.json();
+
+                if(data && data.features && data.features.length > 0) {
+                    const feature = data.features[0];
+                    const lat = feature.geometry.coordinates[1];
+                    const lon = feature.geometry.coordinates[0];
+                    const latlng = L.latLng(lat, lon);
+                    const name = feature.properties.name || query;
+
+                    map.flyTo(latlng, 15);
+
+                    // Actualizar el punto correspondiente
+                    if (type === 'start') {
+                        setStartPoint(latlng, name); // Mantiene el nombre buscado
+                    } else {
+                        setEndPoint(latlng, name);
+                    }
+                    
+                    // Colapsar panel en móvil si ya se completó una acción importante
+                    if(window.innerWidth < 768 && startPoint && endPoint) {
+                        isMobilePanelExpanded = true; toggleMobilePanel(); // Para que el usuario vea el mapa
+                    }
+                } else {
+                    updateStatus("🤷‍♀️ No encontré ese lugar. Intenta otro nombre.");
+                }
+            } catch (e) {
+                console.error(e);
+                updateStatus("❌ Error al buscar.");
+            } finally {
+                btn.className = originalIcon;
             }
         }
 
-        // --- LÓGICA DE RUTAS ---
+        // --- GEOLOCALIZACIÓN ---
 
-        function onMapClick(e) {
-            if (startPoint && endPoint) {
-                resetMap(); 
-                setStartPoint(e.latlng);
+        function locateUser() {
+            if (!navigator.geolocation) {
+                updateStatus("🚫 Sin acceso a ubicación.");
                 return;
             }
+            
+            updateStatus("📍 Buscándote...");
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const latlng = L.latLng(position.coords.latitude, position.coords.longitude);
+                    map.flyTo(latlng, 16);
+                    
+                    // Usar como Inicio automáticamente
+                    setStartPoint(latlng, "✨ Mi Ubicación actual");
+                },
+                () => updateStatus("🔒 Permiso de ubicación denegado.")
+            );
+        }
 
+        // --- LÓGICA DE MAPA Y PUNTOS ---
+
+        function onMapClick(e) {
+            // Lógica inteligente: Si falta inicio, pon inicio. Si hay inicio pero falta fin, pon fin.
+            // Si hay ambos, asume que el usuario quiere cambiar el Destino (caso común).
+            
             if (!startPoint) {
-                setStartPoint(e.latlng);
+                setStartPoint(e.latlng, "📍 Ubicación seleccionada");
             } else if (!endPoint) {
-                setEndPoint(e.latlng);
+                setEndPoint(e.latlng, "📍 Ubicación seleccionada");
+            } else {
+                // Si ya hay ruta, cambiamos el destino por defecto
+                setEndPoint(e.latlng, "📍 Ubicación seleccionada");
             }
         }
 
-        function setStartPoint(latlng) {
+        function setStartPoint(latlng, text = null) {
             startPoint = latlng;
             
-            L.marker(startPoint, {
+            // Eliminar marcador anterior si existe
+            if (startMarker) map.removeLayer(startMarker);
+            
+            // Crear nuevo marcador visual
+            startMarker = L.marker(startPoint, {
                 icon: L.divIcon({
                     className: 'bg-transparent',
-                    html: '<div class="relative"><i class="fa-solid fa-location-dot text-blue-600 text-4xl drop-shadow-lg stroke-white" style="-webkit-text-stroke: 1px white;"></i><div class="absolute -bottom-1 left-1/2 w-4 h-1 bg-black/20 blur-sm rounded-full -translate-x-1/2"></div></div>',
-                    iconSize: [40, 40],
-                    iconAnchor: [20, 38],
-                    popupAnchor: [0, -35]
+                    html: `
+                        <div class="relative group">
+                            <i class="fa-solid fa-location-dot text-rose-500 text-4xl drop-shadow-md stroke-white" style="-webkit-text-stroke: 1px white;"></i>
+                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full mt-[-8px]">
+                                <i class="fa-regular fa-circle text-white text-[10px]"></i>
+                            </div>
+                        </div>`,
+                    iconSize: [35, 35],
+                    iconAnchor: [17, 35]
                 })
             }).addTo(map);
 
-            updateStatus("Ahora toca el <strong>Destino</strong>.");
+            // Actualizar input solo si se provee texto (no sobrescribir si el usuario está escribiendo)
+            if(text) document.getElementById('start-input').value = text;
+            
+            checkAndCalculateRoute();
         }
 
-        function setEndPoint(latlng) {
+        function setEndPoint(latlng, text = null) {
             endPoint = latlng;
-            calculateRoute();
-            updateStatus("<i class='fa-solid fa-spinner fa-spin'></i> Calculando ruta...");
             
-            // Abrir panel en móvil para que el usuario vea que algo pasa
-            openMobilePanel();
+            if (endMarker) map.removeLayer(endMarker);
+            
+            endMarker = L.marker(endPoint, {
+                icon: L.divIcon({
+                    className: 'bg-transparent',
+                    html: `
+                        <div class="relative group">
+                            <i class="fa-solid fa-location-dot text-rose-600 text-4xl drop-shadow-md stroke-white" style="-webkit-text-stroke: 1px white;"></i>
+                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full mt-[-8px]">
+                                <i class="fa-solid fa-flag-checkered text-white text-[10px]"></i>
+                            </div>
+                        </div>`,
+                    iconSize: [35, 35],
+                    iconAnchor: [17, 35]
+                })
+            }).addTo(map);
+
+            if(text) document.getElementById('end-input').value = text;
+            
+            checkAndCalculateRoute();
+        }
+
+        function checkAndCalculateRoute() {
+            // Calcular solo si ambos puntos existen
+            if (startPoint && endPoint) {
+                calculateRoute();
+            } else if (startPoint) {
+                updateStatus("Ahora selecciona el <strong>Destino</strong>");
+            }
         }
 
         function calculateRoute() {
+            // Limpiar ruta previa pero NO los marcadores de input (esos los maneja Leaflet Routing Machine internamente o los reemplaza)
+            // LRM dibuja sus propios marcadores. Para evitar duplicados, ocultamos los nuestros temporales
+            if (startMarker) map.removeLayer(startMarker);
+            if (endMarker) map.removeLayer(endMarker);
+            
             if (routingControl) map.removeControl(routingControl);
+
+            updateStatus("💖 Calculando ruta...");
 
             routingControl = L.Routing.control({
                 waypoints: [
@@ -282,83 +384,103 @@
                     L.latLng(endPoint.lat, endPoint.lng)
                 ],
                 routeWhileDragging: false,
-                showAlternatives: false, // Simplificar para móvil
+                showAlternatives: false,
                 language: 'es',
                 lineOptions: {
-                    styles: [{color: '#dc2626', opacity: 0.8, weight: 6}]
+                    styles: [{color: '#ec4899', opacity: 0.8, weight: 6, className: 'animate-pulse'}]
                 },
                 createGeocoder: function() { return null; },
                 addWaypoints: false,
                 draggableWaypoints: false,
-                fitSelectedRoutes: true
+                fitSelectedRoutes: true,
+                // Personalizar marcadores de la ruta final
+                createMarker: function(i, wp, nWps) {
+                    const isStart = i === 0;
+                    return L.marker(wp.latLng, {
+                        icon: L.divIcon({
+                            className: 'bg-transparent',
+                            html: isStart ? 
+                                `<i class="fa-solid fa-location-dot text-rose-500 text-4xl drop-shadow-md"></i>` :
+                                `<i class="fa-solid fa-location-dot text-rose-600 text-4xl drop-shadow-md"><i class="fa-solid fa-flag-checkered text-white text-[10px] absolute top-1 left-2.5"></i></i>`,
+                            iconSize: [35, 35],
+                            iconAnchor: [17, 35]
+                        })
+                    });
+                }
             }).addTo(map);
 
             routingControl.on('routesfound', function(e) {
                 const routes = e.routes;
                 const summary = routes[0].summary;
+                const min = Math.round(summary.totalTime / 60);
+                const km = (summary.totalDistance / 1000).toFixed(1);
                 
-                const timeMinutes = Math.round(summary.totalTime / 60);
-                const distanceKm = (summary.totalDistance / 1000).toFixed(1);
+                updateStatus(`✨ <strong>${min} min</strong> (${km} km)`);
                 
-                updateStatus(`<strong>${timeMinutes} min</strong> (${distanceKm} km)`);
-                
-                // Activar botón exportar
-                const btnExport = document.getElementById('btn-export');
-                btnExport.disabled = false;
-                btnExport.classList.remove('opacity-50', 'cursor-not-allowed');
+                const btn = document.getElementById('btn-export');
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
 
                 renderInstructions(routes[0].instructions);
                 
-                // Asegurar que el panel esté visible para ver las instrucciones
-                openMobilePanel();
+                // Abrir panel en móvil si está cerrado para ver detalles
+                if (window.innerWidth < 768 && !isMobilePanelExpanded) toggleMobilePanel();
             });
             
-            // Ocultar UI nativa LRM
+            // Ocultar cuadro nativo
             setTimeout(() => {
-                const lrmContainer = document.querySelector('.leaflet-routing-container');
-                if(lrmContainer) lrmContainer.style.display = 'none';
+                const lrm = document.querySelector('.leaflet-routing-container');
+                if(lrm) lrm.style.display = 'none';
             }, 50);
         }
 
         function renderInstructions(instructions) {
             const panel = document.getElementById('instructions-panel');
             panel.innerHTML = ''; 
-
             const ul = document.createElement('ul');
-            ul.className = 'space-y-2 pb-4'; // padding bottom extra para scroll
+            ul.className = 'space-y-3 pb-4';
 
             instructions.forEach((instr, i) => {
                 const li = document.createElement('li');
-                li.className = 'flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-100 shadow-sm';
+                li.className = 'flex items-start gap-3 p-3 bg-pink-50/40 rounded-2xl border border-pink-100 hover:bg-pink-100 transition-colors';
                 
-                let iconClass = 'fa-arrow-up';
-                const text = instr.text.toLowerCase();
-                let colorClass = 'text-gray-500';
+                let icon = 'fa-arrow-up';
+                let color = 'text-pink-400';
+                const txt = instr.text.toLowerCase();
 
-                // Lógica de iconos mejorada
-                if (text.includes('izquierda')) { iconClass = 'fa-arrow-turn-up fa-rotate-270'; colorClass = 'text-blue-600'; }
-                else if (text.includes('derecha')) { iconClass = 'fa-arrow-turn-up fa-rotate-90'; colorClass = 'text-blue-600'; }
-                else if (text.includes('rotonda')) { iconClass = 'fa-spin fa-arrows-spin'; colorClass = 'text-purple-600'; }
-                else if (text.includes('llegado') || instr.type === 'DestinationReached') { iconClass = 'fa-flag-checkered'; colorClass = 'text-red-600'; }
+                if (txt.includes('izquierda')) { icon = 'fa-arrow-turn-up fa-rotate-270'; color = 'text-fuchsia-500'; }
+                else if (txt.includes('derecha')) { icon = 'fa-arrow-turn-up fa-rotate-90'; color = 'text-fuchsia-500'; }
+                else if (txt.includes('rotonda')) { icon = 'fa-arrows-spin'; color = 'text-violet-500'; }
+                else if (txt.includes('llegado') || instr.type === 'DestinationReached') { icon = 'fa-star'; color = 'text-yellow-400'; }
                 
                 li.innerHTML = `
-                    <div class="mt-0.5 w-6 text-center shrink-0 ${colorClass}"><i class="fa-solid ${iconClass}"></i></div>
+                    <div class="mt-1 w-7 h-7 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 ${color}">
+                        <i class="fa-solid ${icon} text-xs"></i>
+                    </div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm text-gray-700 leading-snug font-medium">${instr.text}</div>
-                        <div class="text-xs text-gray-400 font-mono mt-1">
-                            ${i === instructions.length - 1 ? 'Fin' : (instr.distance < 1000 ? Math.round(instr.distance) + ' m' : (instr.distance/1000).toFixed(1) + ' km')}
+                        <div class="text-xs md:text-sm text-gray-700 leading-tight font-medium py-1">${instr.text}</div>
+                        <div class="text-[10px] text-pink-400 font-bold">
+                            ${i === instructions.length-1 ? '¡Llegaste!' : (instr.distance < 1000 ? Math.round(instr.distance)+'m' : (instr.distance/1000).toFixed(1)+'km')}
                         </div>
                     </div>
                 `;
                 ul.appendChild(li);
             });
-
             panel.appendChild(ul);
         }
 
+        // --- UTILIDADES ---
+
+        function updateStatus(html) {
+            document.getElementById('status-text').innerHTML = html;
+        }
+
         function resetMap() {
-            startPoint = null;
-            endPoint = null;
+            startPoint = null; endPoint = null;
+            startMarker = null; endMarker = null;
+            
+            document.getElementById('start-input').value = '';
+            document.getElementById('end-input').value = '';
             
             if (routingControl) {
                 map.removeControl(routingControl);
@@ -366,78 +488,60 @@
             }
 
             map.eachLayer((layer) => {
-                if (layer instanceof L.Marker) {
+                if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
                     map.removeLayer(layer);
                 }
             });
             
             document.getElementById('instructions-panel').innerHTML = `
-                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-4 text-gray-400">
-                    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                        <i class="fa-solid fa-route text-2xl text-gray-300"></i>
-                    </div>
-                    <p class="text-sm font-medium text-gray-500">Mapa reiniciado</p>
-                    <p class="text-xs text-gray-400 mt-1">Toca para empezar de nuevo</p>
+                <div class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 opacity-60">
+                    <img src="https://cdn-icons-png.flaticon.com/512/263/263115.png" alt="Map Icon" class="w-20 h-20 mb-4 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+                    <p class="text-pink-300 font-bold text-lg">¿Lista para irnos?</p>
+                    <p class="text-xs text-gray-400 mt-1">Ingresa inicio y destino arriba</p>
                 </div>
             `;
             
-            const btnExport = document.getElementById('btn-export');
-            btnExport.disabled = true;
-            btnExport.classList.add('opacity-50', 'cursor-not-allowed');
+            const btn = document.getElementById('btn-export');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
 
-            updateStatus("Toca el mapa para fijar <strong>Inicio</strong>.");
-            
-            centerMap();
-            
-            // En móvil, colapsamos el panel para dejar ver el mapa limpio
-            if (window.innerWidth < 768) {
-                isMobilePanelExpanded = true; 
-                toggleMobilePanel(); // Esto lo colapsará porque estaba true
-            }
-        }
-
-        function centerMap() {
+            updateStatus("¡Mapa limpio! ✨");
             map.flyTo(TJ_COORDS, 13);
         }
 
-        function updateStatus(htmlMsg) {
-            document.getElementById('status-text').innerHTML = htmlMsg;
-        }
-
-        function exportRoute() {
-            if (!routingControl || !routingControl._routes || routingControl._routes.length === 0) return;
-            
+        function centerMap() { map.flyTo(TJ_COORDS, 13); }
+        function exportRoute() { /* Misma lógica anterior */ 
+            if (!routingControl || !routingControl._routes) return;
             try {
                 const route = routingControl._routes[0];
-                const coordinates = route.coordinates; 
-                const geoJSON = {
-                    "type": "FeatureCollection",
-                    "features": [{
-                        "type": "Feature",
-                        "properties": {
-                            "name": "Ruta Tijuana",
-                            "distance_m": route.summary.totalDistance,
-                            "time_s": route.summary.totalTime
-                        },
-                        "geometry": {
-                            "type": "LineString",
-                            "coordinates": coordinates.map(c => [c.lng, c.lat]) 
-                        }
-                    }]
-                };
-
+                const geoJSON = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "name": "Ruta Yadi", "created_at": new Date() }, "geometry": { "type": "LineString", "coordinates": route.coordinates.map(c => [c.lng, c.lat]) } }] };
                 const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geoJSON));
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", `ruta_tijuana_${Date.now()}.geojson`);
-                document.body.appendChild(downloadAnchorNode); 
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
+                const a = document.createElement('a');
+                a.href = dataStr; a.download = `ruta_yadi_${Date.now()}.geojson`;
+                a.click();
+            } catch (error) { alert("Error al guardar la ruta :("); }
+        }
 
-            } catch (error) {
-                console.error("Error export:", error);
-                alert("Error al exportar. Intenta nuevamente.");
+        // --- RESPONSIVE ---
+        function applyResponsiveLayout() {
+            const isDesktop = window.innerWidth >= 768;
+            if (isDesktop) {
+                sidebar.style.height = '100%';
+                toggleIcon.style.display = 'none';
+            } else {
+                toggleIcon.style.display = 'block';
+                sidebar.style.height = isMobilePanelExpanded ? MOBILE_EXPANDED_HEIGHT : MOBILE_COLLAPSED_HEIGHT;
             }
+            setTimeout(() => { if(map) map.invalidateSize(); }, 300);
+        }
+
+        function toggleMobilePanel() {
+            if (window.innerWidth >= 768) return;
+            isMobilePanelExpanded = !isMobilePanelExpanded;
+            sidebar.style.height = isMobilePanelExpanded ? MOBILE_EXPANDED_HEIGHT : MOBILE_COLLAPSED_HEIGHT;
+            toggleIcon.className = isMobilePanelExpanded ? 
+                'fa-solid fa-chevron-down transition-transform duration-300' : 
+                'fa-solid fa-chevron-up transition-transform duration-300';
         }
     </script>
 </body>
